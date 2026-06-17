@@ -399,13 +399,33 @@ If another client were to perform another transaction concurrently affecting the
   "errors": [
     {
       "code": "Error",
-      "message": "Transaction has been aborted. Please retry."
+      "message": "conflict: Transaction has been aborted. Please retry."
     }
   ]
 }
 ```
 
 In this case, it should be up to the user of the client to decide if they wish to retry the transaction.
+
+The `message` is prefixed with a `"<code>: <detail>"` category describing why the
+commit aborted, so a client can react appropriately. The `<code>` is one of:
+
+| Code             | Meaning                                                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `conflict`       | Write-write conflict with another concurrent transaction. Retrying typically succeeds.    |
+| `stale-startts`  | The transaction's start timestamp predates the current Zero leader's lease (e.g. a leader change). Retry with a fresh transaction. |
+| `predicate-move` | A predicate the transaction wrote is being moved between groups, blocking commits on it. Retry after the move completes. |
+
+For example, a stale start-timestamp abort returns
+`stale-startts: Transaction has been aborted due to a leader change. Please retry`,
+and a blocked predicate move returns
+`predicate-move: Commits on predicate <name> are blocked due to predicate move`.
+
+:::note
+Older Dgraph servers return the bare detail with no category prefix (e.g.
+`Transaction has been aborted. Please retry.`). Clients should treat a missing or
+unrecognized prefix as an unknown reason rather than failing to parse.
+:::
 
 ### Abort the Transaction
 

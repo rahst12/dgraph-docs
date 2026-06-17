@@ -52,5 +52,34 @@ transactions conflict when both transactions:
 
 When a transaction is aborted, all its changes are discarded.  Transactions can be manually aborted.
 
+#### Abort reasons
+
+A write-write conflict is not the only reason a commit can abort. When Dgraph
+aborts a commit it now reports a *category* describing why, so clients can decide
+how to react (for example, retry immediately versus back off). The category is
+carried as a `"<code>: <detail>"` prefix on the gRPC `ABORTED` status message
+(and on the HTTP error message), where `<code>` is one of:
+
+- `conflict` — a write-write conflict with another concurrent transaction, as
+  described above. Retrying the transaction typically succeeds.
+- `stale-startts` — the transaction's start timestamp predates the current Zero
+  leader's lease (for example, after a leader change). Retrying with a fresh
+  transaction succeeds.
+- `predicate-move` — a predicate the transaction wrote is being moved between
+  groups, so commits on it are temporarily blocked. Retrying once the move
+  completes succeeds.
+
+For example, a conflict abort carries the message
+`conflict: Transaction has been aborted. Please retry`.
+
+:::note
+Older Dgraph servers do not emit a category prefix. Clients that parse the
+reason degrade gracefully and report it as `UNKNOWN` in that case, so existing
+error handling keeps working unchanged.
+:::
+
+The official [Java](/clients/java) and [Python](/clients/python) clients parse
+this category into a typed enum; see those pages for the API.
+
 
 ### In this section

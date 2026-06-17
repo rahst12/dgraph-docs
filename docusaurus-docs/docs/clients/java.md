@@ -81,6 +81,44 @@ client.loginIntoNamespace("groot", "password", 123);
 
 Once logged in, the client can perform all operations allowed for that user in the specified namespace.
 
+## Handling aborted transactions
+
+When a commit aborts, the client throws a `TxnConflictException`. In addition to
+the full server message, the exception exposes the [abort reason](/clients#abort-reasons)
+as a typed `TxnConflictException.AbortReason`, so you can branch on *why* the
+commit aborted:
+
+```java
+import io.dgraph.TxnConflictException;
+import io.dgraph.TxnConflictException.AbortReason;
+
+Transaction txn = client.newTransaction();
+try {
+    // ... mutations ...
+    txn.commit();
+} catch (TxnConflictException e) {
+    switch (e.getReason()) {
+        case CONFLICT:
+        case STALE_STARTTS:
+            // Safe to retry with a fresh transaction.
+            break;
+        case PREDICATE_MOVE:
+            // A predicate is being moved between groups; retry after a short backoff.
+            break;
+        case UNKNOWN:
+            // No category reported (e.g. an older server). Fall back to the message.
+            break;
+    }
+    System.err.println("commit aborted: " + e.getMessage());
+} finally {
+    txn.discard();
+}
+```
+
+`getReason()` returns `AbortReason.UNKNOWN` when the server reports no category,
+so the code above works unchanged against older Dgraph servers. `isRetryable()`
+remains available for code that only needs the retry/no-retry distinction.
+
 ## Documentation
 
 For complete API documentation, examples, and advanced usage:
