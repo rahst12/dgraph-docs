@@ -106,7 +106,9 @@ try {
             // A predicate is being moved between groups; retry after a short backoff.
             break;
         case UNKNOWN:
-            // No category reported (e.g. an older server). Fall back to the message.
+            // No category reported. Fall back to the message, which still explains
+            // what happened. Reached against an older server, and also when a
+            // current server declines to categorize a cause.
             break;
     }
     System.err.println("commit aborted: " + e.getMessage());
@@ -115,9 +117,17 @@ try {
 }
 ```
 
-`getReason()` returns `AbortReason.UNKNOWN` when the server reports no category,
-so the code above works unchanged against older Dgraph servers. `isRetryable()`
-remains available for code that only needs the retry/no-retry distinction.
+`getReason()` returns `AbortReason.UNKNOWN` whenever the server reports no
+category, so the code above works unchanged against older Dgraph servers — and
+also against current ones, which deliberately leave some causes uncategorized
+rather than implying the wrong remedy (see
+[abort reasons](/clients#abort-reasons)). Always keep an `UNKNOWN` branch;
+`getMessage()` still carries the explanation. An unrecognized category also
+degrades to `UNKNOWN`, so a newer server can add categories without breaking
+this code.
+
+`isRetryable()` remains available for code that only needs the retry/no-retry
+distinction.
 
 ## Documentation
 

@@ -103,15 +103,22 @@ except pydgraph.AbortedError as e:
         # A predicate is being moved between groups; retry after a short backoff.
         ...
     else:  # pydgraph.AbortReason.UNKNOWN
-        # No category reported (e.g. an older server). Fall back to the message.
+        # No category reported. Fall back to the message, which still explains
+        # what happened. Reached against an older server, and also when a
+        # current server declines to categorize a cause.
         ...
     print("commit aborted:", e)
 finally:
     txn.discard()
 ```
 
-`AbortedError.reason` is `pydgraph.AbortReason.UNKNOWN` when the server reports no
-category, so the code above works unchanged against older Dgraph servers.
+`AbortedError.reason` is `pydgraph.AbortReason.UNKNOWN` whenever the server
+reports no category, so the code above works unchanged against older Dgraph
+servers — and also against current ones, which deliberately leave some causes
+uncategorized rather than implying the wrong remedy (see
+[abort reasons](/clients#abort-reasons)). Always keep the `UNKNOWN` branch; the
+message still carries the explanation. An unrecognized category also degrades to
+`UNKNOWN`, so a newer server can add categories without breaking this code.
 
 ## Documentation
 
